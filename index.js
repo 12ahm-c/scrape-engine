@@ -45,13 +45,12 @@ app.post("/scrape/facebook", async (req, res) => {
       timeout: 60000,
     });
 
-    await page.waitForTimeout(5000);
+await new Promise(resolve => setTimeout(resolve, 5000));
 
     // scroll safely
     for (let i = 0; i < 20; i++) {
       await page.evaluate(() => window.scrollBy(0, window.innerHeight));
-      await page.waitForTimeout(1200);
-    }
+await new Promise(resolve => setTimeout(resolve, 1200));    }
 
     const comments = await page.evaluate(() => {
       const nodes = document.querySelectorAll("div[dir='auto']");
