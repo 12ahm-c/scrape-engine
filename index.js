@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // ==============================
-// 🔥 Facebook Scraper (STABLE VERSION)
+// 🔥 Facebook Scraper (FINAL VERSION)
 // ==============================
 app.post("/scrape/facebook", async (req, res) => {
   let browser;
@@ -36,9 +36,25 @@ app.post("/scrape/facebook", async (req, res) => {
 
     const page = await browser.newPage();
 
-    // 🔥 User-Agent (important for Facebook)
+    // 🔥 User-Agent
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+    );
+
+    // ==============================
+    // 🔥 ADD COOKIES (IMPORTANT FIX)
+    // ==============================
+    await page.setCookie(
+      {
+        name: "c_user",
+        value: process.env.FB_C_USER,
+        domain: ".facebook.com",
+      },
+      {
+        name: "xs",
+        value: process.env.FB_XS,
+        domain: ".facebook.com",
+      }
     );
 
     // 🔥 Open page
@@ -47,7 +63,7 @@ app.post("/scrape/facebook", async (req, res) => {
       timeout: 60000,
     });
 
-    // 🔥 Wait for content to appear (IMPORTANT FIX)
+    // 🔥 Wait for content
     try {
       await page.waitForSelector("div[role='article']", {
         timeout: 20000,
@@ -64,13 +80,13 @@ app.post("/scrape/facebook", async (req, res) => {
       await new Promise((r) => setTimeout(r, 1200));
     }
 
-    // 🔥 Extract comments/posts text
+    // 🔥 Extract posts/comments
     const comments = await page.evaluate(() => {
       const posts = document.querySelectorAll("div[role='article']");
 
       return Array.from(posts)
         .map((el) => el.innerText)
-        .filter((text) => text && text.length > 10 && text.length < 1000);
+        .filter((text) => text && text.length > 10 && text.length < 1500);
     });
 
     await browser.close();
@@ -83,9 +99,7 @@ app.post("/scrape/facebook", async (req, res) => {
   } catch (err) {
     console.error("🔥 FACEBOOK SCRAPER ERROR:", err);
 
-    if (browser) {
-      await browser.close();
-    }
+    if (browser) await browser.close();
 
     return res.status(500).json({
       success: false,
@@ -95,14 +109,14 @@ app.post("/scrape/facebook", async (req, res) => {
 });
 
 // ==============================
-// 🔥 HEALTH CHECK (Render required)
+// 🔥 HEALTH CHECK
 // ==============================
 app.get("/", (req, res) => {
   res.send("Scrape Engine is running 🚀");
 });
 
 // ==============================
-// 🔥 START SERVER (Render compatible)
+// 🔥 START SERVER
 // ==============================
 const PORT = process.env.PORT || 3000;
 
