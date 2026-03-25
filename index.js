@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // ==============================
-// 🔥 Facebook Scraper (FIXED + STABLE)
+// 🔥 Facebook Scraper (STABLE VERSION)
 // ==============================
 app.post("/scrape/facebook", async (req, res) => {
   let browser;
@@ -21,13 +21,14 @@ app.post("/scrape/facebook", async (req, res) => {
       return res.status(400).json({ error: "Missing URL" });
     }
 
-    // 🚀 Launch browser (Render stable config)
+    // 🚀 Launch browser (Render compatible)
     browser = await puppeteer.launch({
       args: [
         ...chromium.args,
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
+        "--disable-gpu",
       ],
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
@@ -35,61 +36,76 @@ app.post("/scrape/facebook", async (req, res) => {
 
     const page = await browser.newPage();
 
+    // 🔥 User-Agent (important for Facebook)
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
     );
 
-    // 🚨 IMPORTANT: avoid networkidle2
+    // 🔥 Open page
     await page.goto(url, {
-      waitUntil: "domcontentloaded",
+      waitUntil: "networkidle2",
       timeout: 60000,
     });
 
-await new Promise(resolve => setTimeout(resolve, 5000));
+    // 🔥 Wait for content to appear (IMPORTANT FIX)
+    try {
+      await page.waitForSelector("div[role='article']", {
+        timeout: 20000,
+      });
+    } catch (e) {
+      console.log("⚠️ No articles found, continuing...");
+    }
 
-    // scroll safely
-    for (let i = 0; i < 20; i++) {
-      await page.evaluate(() => window.scrollBy(0, window.innerHeight));
-await new Promise(resolve => setTimeout(resolve, 1200));    }
+    // 🔥 Scroll to load more content
+    for (let i = 0; i < 10; i++) {
+      await page.evaluate(() => {
+        window.scrollBy(0, window.innerHeight);
+      });
+      await new Promise((r) => setTimeout(r, 1200));
+    }
 
+    // 🔥 Extract comments/posts text
     const comments = await page.evaluate(() => {
-      const nodes = document.querySelectorAll("div[dir='auto']");
+      const posts = document.querySelectorAll("div[role='article']");
 
-      return Array.from(nodes)
-        .map(el => el.innerText)
-        .filter(Boolean);
+      return Array.from(posts)
+        .map((el) => el.innerText)
+        .filter((text) => text && text.length > 10 && text.length < 1000);
     });
 
     await browser.close();
 
     return res.json({
+      success: true,
       commentCount: comments.length,
       comments,
     });
-
   } catch (err) {
     console.error("🔥 FACEBOOK SCRAPER ERROR:", err);
 
-    if (browser) await browser.close();
+    if (browser) {
+      await browser.close();
+    }
 
     return res.status(500).json({
+      success: false,
       error: err.message || "Internal Server Error",
     });
   }
 });
 
 // ==============================
-// 🔥 HEALTH CHECK (IMPORTANT FOR RENDER)
+// 🔥 HEALTH CHECK (Render required)
 // ==============================
 app.get("/", (req, res) => {
-  res.status(200).send("Scrape Engine is running 🚀");
+  res.send("Scrape Engine is running 🚀");
 });
 
 // ==============================
-// 🔥 START SERVER (FIXED FOR RENDER)
+// 🔥 START SERVER (Render compatible)
 // ==============================
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
   console.log(`Scraper running on port ${PORT}`);
 });
