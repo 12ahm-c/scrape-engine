@@ -3,41 +3,89 @@ import cors from "cors";
 import { chromium } from "playwright";
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-// 🔥 Facebook scraper
+// ==============================
+// 🔥 Facebook Scraper (FULL FIXED)
+// ==============================
 app.post("/scrape/facebook", async (req, res) => {
-  const { url } = req.body;
+  let browser;
 
-  if (!url) return res.status(400).json({ error: "Missing URL" });
+  try {
+    const { url } = req.body;
 
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+    if (!url) {
+      return res.status(400).json({ error: "Missing URL" });
+    }
 
-  await page.goto(url, { waitUntil: "networkidle" });
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
+    });
 
-  // scroll لجلب التعليقات
-  for (let i = 0; i < 15; i++) {
-    await page.mouse.wheel(0, 3000);
-    await page.waitForTimeout(1500);
+    const page = await browser.newPage();
+
+    await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+
+    // 🔥 انتظار تحميل الصفحة
+    await page.waitForTimeout(5000);
+
+    // 🔥 scroll لجلب التعليقات
+    for (let i = 0; i < 30; i++) {
+      await page.mouse.wheel(0, 3000);
+      await page.waitForTimeout(1500);
+    }
+
+    // 🔥 استخراج التعليقات
+    const comments = await page.evaluate(() => {
+      const nodes = document.querySelectorAll("div[dir='auto']");
+
+      return Array.from(nodes)
+        .map((n) => n.innerText)
+        .filter((t) => t && t.length > 1);
+    });
+
+    await browser.close();
+
+    return res.json({
+      commentCount: comments.length,
+      comments,
+    });
+
+  } catch (err) {
+    console.error("🔥 FACEBOOK SCRAPER ERROR:", err);
+
+    if (browser) {
+      await browser.close();
+    }
+
+    return res.status(500).json({
+      error: err.message || "Internal Server Error",
+    });
   }
-
-  const comments = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll("div[dir='auto']"))
-      .map(el => el.innerText)
-      .filter(Boolean);
-  });
-
-  await browser.close();
-
-  res.json({
-    count: comments.length,
-    comments,
-  });
 });
 
-// تشغيل السيرفر
-app.listen(3000, () => {
-  console.log("Scraper running on port 3000");
+// ==============================
+// 🔥 HEALTH CHECK (مهم لـ Render)
+// ==============================
+app.get("/", (req, res) => {
+  res.send("Scrape Engine is running 🚀");
+});
+
+// ==============================
+// 🔥 START SERVER
+// ==============================
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Scraper running on port ${PORT}`);
 });
