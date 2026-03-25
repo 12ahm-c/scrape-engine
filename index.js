@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // ==============================
-// 🔥 Facebook Scraper (Puppeteer FIXED)
+// 🔥 Facebook Scraper (FIXED + STABLE)
 // ==============================
 app.post("/scrape/facebook", async (req, res) => {
   let browser;
@@ -21,9 +21,14 @@ app.post("/scrape/facebook", async (req, res) => {
       return res.status(400).json({ error: "Missing URL" });
     }
 
-    // 🚀 Launch browser (Render compatible)
+    // 🚀 Launch browser (Render stable config)
     browser = await puppeteer.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
     });
@@ -34,27 +39,26 @@ app.post("/scrape/facebook", async (req, res) => {
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
     );
 
+    // 🚨 IMPORTANT: avoid networkidle2
     await page.goto(url, {
-      waitUntil: "networkidle2",
+      waitUntil: "domcontentloaded",
       timeout: 60000,
     });
 
-    // 🔥 wait load
     await page.waitForTimeout(5000);
 
-    // 🔥 scroll to load comments
-    for (let i = 0; i < 25; i++) {
+    // scroll safely
+    for (let i = 0; i < 20; i++) {
       await page.evaluate(() => window.scrollBy(0, window.innerHeight));
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(1200);
     }
 
-    // 🔥 extract comments
     const comments = await page.evaluate(() => {
       const nodes = document.querySelectorAll("div[dir='auto']");
 
       return Array.from(nodes)
-        .map((el) => el.innerText)
-        .filter((t) => t && t.length > 1);
+        .map(el => el.innerText)
+        .filter(Boolean);
     });
 
     await browser.close();
@@ -76,17 +80,17 @@ app.post("/scrape/facebook", async (req, res) => {
 });
 
 // ==============================
-// 🔥 HEALTH CHECK
+// 🔥 HEALTH CHECK (IMPORTANT FOR RENDER)
 // ==============================
 app.get("/", (req, res) => {
-  res.send("Scrape Engine is running 🚀");
+  res.status(200).send("Scrape Engine is running 🚀");
 });
 
 // ==============================
-// 🔥 START SERVER
+// 🔥 START SERVER (FIXED FOR RENDER)
 // ==============================
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Scraper running on port ${PORT}`);
 });
